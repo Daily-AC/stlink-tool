@@ -4,7 +4,9 @@ name: Build wdi-simple.exe (libwdi)
 # from upstream source on a Windows runner. The resulting binary is uploaded
 # as a workflow artifact; we then commit it to vendor/ in this repo.
 #
-# Re-run only when bumping libwdi (input `libwdi_ref`).
+# Build recipe mirrors libwdi's own CI (.github/workflows/codeql.yml in the
+# pbatard/libwdi repo): the embedder project needs WDK 8.0's WdfCoInstaller
+# DLL plus libusb0 and libusbK driver redistributables.
 
 on:
   workflow_dispatch:
@@ -13,6 +15,11 @@ on:
         description: 'libwdi git ref to build (tag or branch)'
         required: false
         default: 'v1.5.1'
+
+env:
+  WDK_URL: https://go.microsoft.com/fwlink/p/?LinkID=253170
+  LIBUSB0_URL: https://github.com/mcuee/libusb-win32/releases/download/release_1.4.0.0/libusb-win32-bin-1.4.0.0.zip
+  LIBUSBK_URL: https://github.com/mcuee/libusbk/releases/download/V3.1.0.0/libusbK-3.1.0.0-bin.7z
 
 jobs:
   build:
@@ -26,19 +33,34 @@ jobs:
         with:
           repository: pbatard/libwdi
           ref: ${{ github.event.inputs.libwdi_ref }}
-          path: libwdi
+
+      - name: Download WDK 8.0 + libusb0 + libusbK redistributables
+        shell: cmd
+        run: |
+          curl -L "%WDK_URL%" -o wdk-redist.msi
+          curl -L "%LIBUSB0_URL%" -o libusb0-redist.zip
+          curl -L "%LIBUSBK_URL%" -o libusbk-redist.7z
+          msiexec /a wdk-redist.msi /qn TARGETDIR=%CD%\wdk
+          7z x libusb0-redist.zip
+          7z x libusbk-redist.7z
+          move libusb-win32* libusb0
+          move libusbK* libusbk
+          dir
 
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v2
 
       - name: Build solution (Release|x64)
-        working-directory: libwdi
-        run: msbuild libwdi.sln /p:Configuration=Release /p:Platform=x64 /m /verbosity:minimal
+        shell: cmd
+        run: |
+          msbuild libwdi.sln /m /p:Configuration=Release,Platform=x64,BuildMacros="WDK_DIR=\"../wdk/Windows Kits/8.0\";LIBUSB0_DIR=\"../libusb0\";LIBUSBK_DIR=\"../libusbk/bin\"" /verbosity:minimal
 
-      - name: Locate and stage artifacts
+      - name: Locate and stage artifact
         shell: pwsh
         run: |
-          $exe = Get-ChildItem -Path libwdi -Recurse -Filter wdi-simple.exe | Where-Object { $_.FullName -match 'Release|x64' } | Select-Object -First 1
+          $exe = Get-ChildItem -Path . -Recurse -Filter wdi-simple.exe `
+                 | Where-Object { $_.FullName -match 'Release' -and $_.FullName -match 'x64' } `
+                 | Select-Object -First 1
           if (-not $exe) { throw "wdi-simple.exe not found after build" }
           New-Item -ItemType Directory -Force -Path dist | Out-Null
           Copy-Item $exe.FullName dist\wdi-simple.exe
