@@ -45,7 +45,14 @@ jobs:
           7z x libusbk-redist.7z
           move libusb-win32* libusb0
           move libusbK* libusbk
+          echo === workflow root ===
           dir
+          echo === libusbk tree ===
+          dir /s /b libusbk
+          echo === libusb0 tree ===
+          dir /s /b libusb0
+          echo === wdk top ===
+          dir wdk
 
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v2
