@@ -1,0 +1,54 @@
+name: Build wdi-simple.exe (libwdi)
+
+# Manually-triggered, one-off helper that compiles libwdi's wdi-simple.exe
+# from upstream source on a Windows runner. The resulting binary is uploaded
+# as a workflow artifact; we then commit it to vendor/ in this repo.
+#
+# Re-run only when bumping libwdi (input `libwdi_ref`).
+
+on:
+  workflow_dispatch:
+    inputs:
+      libwdi_ref:
+        description: 'libwdi git ref to build (tag or branch)'
+        required: false
+        default: 'v1.5.1'
+
+jobs:
+  build:
+    name: Build wdi-simple.exe x64
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout libwdi
+        uses: actions/checkout@v4
+        with:
+          repository: pbatard/libwdi
+          ref: ${{ github.event.inputs.libwdi_ref }}
+          path: libwdi
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Build solution (Release|x64)
+        working-directory: libwdi
+        run: msbuild libwdi.sln /p:Configuration=Release /p:Platform=x64 /m /verbosity:minimal
+
+      - name: Locate and stage artifacts
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem -Path libwdi -Recurse -Filter wdi-simple.exe | Where-Object { $_.FullName -match 'Release|x64' } | Select-Object -First 1
+          if (-not $exe) { throw "wdi-simple.exe not found after build" }
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Copy-Item $exe.FullName dist\wdi-simple.exe
+          (Get-FileHash dist\wdi-simple.exe -Algorithm SHA256).Hash | Out-File -Encoding ascii dist\wdi-simple.exe.sha256
+          Get-ChildItem dist | Format-Table Name,Length
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wdi-simple-x64
+          path: dist/
+          if-no-files-found: error
+          retention-days: 90
