@@ -42,10 +42,11 @@ jobs:
           curl -L "%LIBUSBK_URL%" -o libusbk-redist.7z
           msiexec /a wdk-redist.msi /qn TARGETDIR=%CD%\wdk
           7z x libusb0-redist.zip -y
-          del libusb0-redist.zip
+          7z x libusbk-redist.7z -y
+          del *.zip
+          del *.7z
           move libusb-win32* libusb0
-          7z x libusbk-redist.7z -olibusbk -y
-          del libusbk-redist.7z
+          move libusbK* libusbk
           if not exist libusbk\bin\sys\amd64\libusbK.sys (
             echo ERROR: libusbK extraction did not produce expected structure
             dir /s /b libusbk
