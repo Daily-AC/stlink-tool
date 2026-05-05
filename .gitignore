@@ -1,0 +1,18 @@
+/target
+**/*.rs.bk
+*.pdb
+
+# Local IDE
+.idea/
+.vscode/
+*.iml
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Cargo lock is committed (binary crate, want reproducible builds)
+# Cargo.lock is intentionally tracked.
+
+# vendor/ blobs ARE committed — we want `git clone && cargo build` to work
+# without running any fetch script. (~9 MB total: zadig + openocd zip)
