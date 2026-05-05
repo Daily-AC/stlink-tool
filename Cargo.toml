@@ -1,6 +1,6 @@
 [package]
 name = "stlink-tool"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 authors = ["Zhang Yilin"]
 description = "Drag-and-drop STM32F10x flasher with self-healing ST-Link WinUSB driver on Windows"

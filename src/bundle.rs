@@ -1,10 +1,10 @@
-//! Embedded vendor blobs (Zadig + xpack-openocd) extracted to a per-version
-//! cache directory under `%LOCALAPPDATA%\stlink-tool\bundle-<sha8>\`.
+//! Embedded vendor blobs (wdi-simple + xpack-openocd) extracted to a
+//! per-version cache directory under `%LOCALAPPDATA%\stlink-tool\bundle-<sha8>\`.
 //!
 //! Cache key = SHA-256 of the concatenated embedded bytes, truncated to 8 hex
 //! chars. Different tool versions produce different keys, so upgrades don't
-//! collide and old caches can be GC'd by deleting any `bundle-*` sibling that
-//! isn't the active one.
+//! collide; the GC step removes any sibling `bundle-*` directory that isn't
+//! the active one.
 
 use std::fs;
 use std::io::{Cursor, Read, Write};
@@ -14,14 +14,12 @@ use sha2::{Digest, Sha256};
 
 use crate::error::FlashError;
 
-const ZADIG_EXE: &[u8] = include_bytes!("../vendor/zadig-2.9.exe");
-const ZADIG_INI: &[u8] = include_bytes!("../resources/zadig.ini");
+const WDI_SIMPLE_EXE: &[u8] = include_bytes!("../vendor/wdi-simple.exe");
 const OPENOCD_ZIP: &[u8] = include_bytes!("../vendor/xpack-openocd-0.12.0-7-win32-x64.zip");
 
 #[derive(Clone, Debug)]
 pub struct Bundle {
-    pub zadig_exe: PathBuf,
-    pub zadig_cwd: PathBuf, // dir holding zadig.exe + zadig.ini, used as CWD by ShellExecute
+    pub wdi_simple_exe: PathBuf,
     pub openocd_exe: PathBuf,
     pub openocd_scripts: PathBuf,
 }
@@ -45,8 +43,7 @@ pub fn ensure() -> Result<Bundle, FlashError> {
 
     let openocd_root = dir.join("xpack-openocd-0.12.0-7");
     Ok(Bundle {
-        zadig_exe: dir.join("zadig.exe"),
-        zadig_cwd: dir.clone(),
+        wdi_simple_exe: dir.join("wdi-simple.exe"),
         openocd_exe: openocd_root.join("bin").join("openocd.exe"),
         openocd_scripts: openocd_root.join("scripts"),
     })
@@ -54,8 +51,7 @@ pub fn ensure() -> Result<Bundle, FlashError> {
 
 fn bundle_key() -> String {
     let mut h = Sha256::new();
-    h.update(ZADIG_EXE);
-    h.update(ZADIG_INI);
+    h.update(WDI_SIMPLE_EXE);
     h.update(OPENOCD_ZIP);
     let digest = h.finalize();
     hex8(&digest[..])
@@ -70,20 +66,14 @@ fn hex8(bytes: &[u8]) -> String {
 }
 
 fn cache_root() -> Result<PathBuf, FlashError> {
-    // On Windows: %LOCALAPPDATA%\stlink-tool
-    // On macOS/Linux dev builds: ~/.cache/stlink-tool — used only for `cargo check`,
-    // the tool isn't functional outside Windows.
     let dirs = directories::ProjectDirs::from("", "", "stlink-tool")
         .ok_or_else(|| FlashError::BundleError("could not resolve cache dir".into()))?;
     Ok(dirs.cache_dir().to_path_buf())
 }
 
 fn extract_into(dir: &Path) -> Result<(), FlashError> {
-    // 1. Zadig + zadig.ini side by side
-    write_file(&dir.join("zadig.exe"), ZADIG_EXE)?;
-    write_file(&dir.join("zadig.ini"), ZADIG_INI)?;
+    write_file(&dir.join("wdi-simple.exe"), WDI_SIMPLE_EXE)?;
 
-    // 2. Unzip xpack-openocd
     let cursor = Cursor::new(OPENOCD_ZIP);
     let mut archive = zip::ZipArchive::new(cursor)
         .map_err(|e| FlashError::BundleError(format!("openocd zip header: {e}")))?;

@@ -22,7 +22,7 @@ pub enum FlashError {
     #[error("No ST-Link found. Plug in the debugger and try again.")]
     NoStlinkDevice,
 
-    #[error("ST-Link driver missing or wrong — Zadig will open. Pick the ST-Link entry and click 'Replace Driver'.")]
+    #[error("ST-Link driver missing or wrong — installing WinUSB now (UAC will prompt).")]
     DriverFixNeeded,
 
     #[error("Driver fix was cancelled (UAC declined).")]
@@ -30,6 +30,9 @@ pub enum FlashError {
 
     #[error("Driver fix did not take effect. Try unplug/replug, then drop the file again.")]
     DriverFixIneffective,
+
+    #[error("wdi-simple exited with code {exit_code}. Re-plug the ST-Link and try again.")]
+    DriverFixFailed { exit_code: u32 },
 
     #[error("OpenOCD failed: {0}")]
     OpenocdFailed(String),
